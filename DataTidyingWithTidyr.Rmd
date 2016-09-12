@@ -1,0 +1,77 @@
+---
+title: "Data Tidying with tidyr"
+output:
+  html_document:
+    theme: united
+    highlight: tango
+    toc: true
+    toc_depth: 1
+    fontsize: 13pt
+---
+##
+
+This is a reading note from Data Science with R. For more details this chapter please see <http://garrettgman.github.io/tidying/>.
+
+## Prerequisites
+
+DSR is the dataset.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_package}
+#install.packages(c("tidyr","devtools"))
+#devtools::install_github("garrettgman/DSR")
+```
+
+## Four types of data table
+
+```{r}
+library(DSR)
+table1
+table2
+table3
+table4
+table5
+```
+
+# So, which dataset we will consider as a tidy dataset?
+
+## Three rules of tidy datasets
+
+Your data will be easier to work with R if it follows three rules:
+
+1. Each **variable** in the dataset is placed in its own **column**
+2. Each **observation** is placed in its own **row**
+3. Each **value** is placed in its own **cell**
+
+Data that satisfies these rules is known as tidy data. Notice that *table1* is tidy data.
+
+# Why we need tidy data?
+## Tidy data with R
+
+Tidy data works well with R because R is a **vectorized** programming language.
+
+1. Data structures in R are built from **vector**
+2. R's operations are optimized to work with vectors.
+
+Tidy data take advantage of both of these traits.
+
+In R, a data frame is a list of vector that R displays as a table. When your data is tidy, the values of each vairable fall in their own column vector.
+
+---
+
+With tidy data, you can easily extract and manipulate the values of a variable:
+
+```{r extract_var}
+table1$cases
+```
+
+Then you can extract abd manipulate the value of variables in tidy data with concise, simple code:
+
+```{r}
+mean(table$cases)
+table1$cases / table$population * 10000
+```
+
