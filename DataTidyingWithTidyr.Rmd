@@ -5,7 +5,7 @@ output:
     theme: united
     highlight: tango
     toc: true
-    toc_depth: 1
+    toc_depth: 2
     fontsize: 13pt
 ---
 ##
@@ -66,6 +66,11 @@ With tidy data, you can easily extract and manipulate the values of a variable:
 
 ```{r extract_var}
 table1$cases
+# Visualise changes over time
+library(ggplot2)
+ggplot(table1, aes(year, cases)) + 
+  geom_line(aes(group = country), colour = "grey50") + 
+  geom_point(aes(colour = country))
 ```
 
 Then you can extract abd manipulate the value of variables in tidy data with concise, simple code:
@@ -130,7 +135,7 @@ cases / population * 10000
 
 Data set one is much easier to work with than with data sets two, three, or four. To work with data sets two, three, and four, you need to take extra steps, which makes your code harder to write, harder to understand, and harder to debug.
 
-# spread() and gather()
+# spread() and gather()-- reshape the layout
 
 The tidyr package will help to tidy your data. It contains four funcions.
 
@@ -152,7 +157,7 @@ n table2, the key column contains only keys (and not just because the column is 
 
 You can use the **spread()** function to tidy this layout.
 
-## spread()
+## spread()- Spread rows into columns
 
 spread() turns a pair of key:value columns into a set of tidy columns. To use spread(), pass it the name of a data frame, then the name of the key column in the data frame, and then the name of the value column. Pass the column names as they are; **do not use quotes**.
 
@@ -182,7 +187,7 @@ spread() distributes a pair of key:**value** columns into a field of **cells**. 
 4. drop - The drop argument controls how spread() handles factors in the key column. If you set drop = FALSE, spread will **keep factor levels** that do not appear in the key column, filling in the missing combinations with the value of fill.
 
 
-## gather()
+## gather()- Gather columns into rows.
 
 gather() does the **reverse** of spread(). gather() collects a set of column names and places them into a single “key” column. It also collects the cells of those columns and places them into a single value column. You can use gather() to tidy table4.
 
@@ -196,6 +201,10 @@ To use gather(), pass it the name of a data frame to reshape. Then pass gather()
 gather(table4a,"year","case",2:3)
 # year for the variable names
 # case for the variable values
+
+# Another way to gather
+table4a %>% 
+  gather(key = "year", value = "cases",`1999`, `2000`)
 ```
 
 gather() returns a copy of the data frame with the specified columns removed. To this data frame, gather() has added two new columns: a “key” column that contains the former column names of the removed columns, and a value column that contains the former values of the removed columns. 
@@ -207,8 +216,261 @@ We can do the same to table 4b:
 ```{r gather_tbl4b}
 table4b
 gather(table4b,"year","population",2:3)
-## another way
+## Another way
 gather(table4b,"year","population",-1)
-
+## Another way using pipe
+table4b %>% 
+  gather(key = "year", value = "population",`1999`, `2000`)
 ```
+
+You can also identify columns by name with the notation introduced by the **select()** in dplyr
+
+### Combine table4a and table4b together using dplyr
+
+```{r comb_dplyr}
+library(dplyr)
+tidy4a <- table4a %>% 
+  gather(`1999`, `2000`, key = "year", value = "cases")
+tidy4b <- table4b %>% 
+  gather(`1999`, `2000`, key = "year", value = "population")
+left_join(tidy4a, tidy4b,by=c("country", "year"))
+```
+
+## Exercises
+### 1. Why are gather() and spread() not perfectly symmetrical?
+Carefully consider the following example:
+
+```{r ex1.1}
+stocks <- data_frame(
+  year   = c(2015, 2015, 2016, 2016),
+  half  = c(   1,    2,     1,    2),
+  return = c(1.88, 0.59, 0.92, 0.17)
+)
+stocks %>% 
+  spread(year, return) %>% 
+  gather("year", "return", `2015`:`2016`)
+```
+
+1. The orders of column names would change 
+2. The types of year change from double to character. 
+
+Both spread() and gather() have a convert argument. Let's try to use this to fix the 2nd problem 
+
+```{r ex1.2}
+stocks %>% 
+  spread(year, return, convert=T) %>% 
+  gather("year", "return", `2015`:`2016`,convert=T) 
+```
+
+Using convert=T in gather() only change the type of year to int, didn't maintain the original type
+
+### 2. Why does this code fail?
+
+```{r ex2}
+#table4a %>% 
+#  gather(1999, 2000, key = "year", value = "cases")
+#> Error in eval(expr, envir, enclos): Error: Position must be between 0 and n
+```
+ 
+If we use 1999, 2000 without "", it will indicate **the indices of columns** so it try to find 1999th and 2000th columns . So, you need "" to indicate these is the names.
+
+### 3. Why does spreading this tibble fail? How could you add a new column to fix the problem?
+
+```{r ex3.data}
+people <- frame_data(
+  ~name, ~key, ~value,
+  "Phillip Woods","age",       45,
+  "Phillip Woods",   "height",   186,
+  "Phillip Woods",   "age",       50,
+  "Jessica Cordero", "age",       37,
+  "Jessica Cordero", "height",   156
+) 
+# frame_data helps you to do Row-Wise Data_frame Creation
+people
+# if you get error on this one, you need to re-install the dplyr package
+# try to spread()
+# people %>% 
+#   spread(key,value) 
+#Error: Duplicate identifiers for rows (1, 3)
+
+## the people have 2 age records, we can give an index column
+
+## the first way 
+people1=people
+people1$row <- 1:nrow(people1)
+wide <- spread(people1, key,value)
+
+## the second way 
+people %>%
+   group_by(name, key) %>% 
+   summarise(value=toString(unique(value))) %>% 
+   spread(key,value, fill='')
+```
+
+The solution is from thess link 
+
+1. <http://stackoverflow.com/questions/25960394/unexpected-behavior-with-tidyr>
+
+2. <http://stackoverflow.com/questions/31209388/r-spread-function-on-data-frame-with-duplicates>
+
+### 3. Tidy the simple tibble below. Do you need to spread or gather it? What are the variables?
+
+```{r ex4}
+preg <- frame_data(
+  ~pregnant, ~male, ~female,
+  "yes",     NA,    10,
+  "no",      20,    12
+)
+
+# I will ctrat a variable called gender
+gather(preg,"gender","count",-1)
+```
+
+
+# separate() and unite()--split and combine cells
+
+spread() and gather() help you reshape the layout of your data to place variables in columns and observations in rows. separate() and unite() help you split and combine cells to place a single, complete value in each cell.
+
+## separate()- Separate one column into several
+
+To use separate() pass separate the name of a data frame to reshape and the name of a column to separate. Also give separate() an into argument, which should be a vector of character strings to use as new column names. 
+
+separate() will return a copy of the data frame with the column removed. The previous values of the column will be split across several columns, one for each name in into.
+
+```{r separate}
+table3
+separate(table3, rate, into = c("cases","population") )
+## Another way using pipe
+table3 %>% 
+  separate(rate, into = c("cases", "population"))
+```
+
+By default, separate() will split values wherever a **non-alphanumeric character** appears. Non-alphanumeric characters are characters that are neither a number nor a letter. For example, in the code above, separate() split the values of rate at the forward slash characters.
+
+### Other argument -- sep 
+
+#### Specify symbols using sep = "symbol"
+
+If you wish to use a specific character to separate a column, you can pass the character to the sep argument of separate(). For example, we could rewrite the code above as
+
+```{r separate_sep}
+separate(table3,rate,into=c("case","population"),sep="/")
+
+## Another solution using pipe
+table3 %>% 
+  separate(rate, into = c("cases", "population"), sep = "/")
+```
+
+#### Specify digits using sep = num
+
+You can also pass an integer or vector of integers to sep. separate() will interpret the integers as positions to split at. **Positive** values start at 1 at the **far-left** of the strings; **negative** value start at -1 at the **far-right** of the strings. The length of sep should be one less than the number of names in into. You can use this arrangement to separate the last two digits of each year.
+
+```{r separate_sep_num}
+table3 %>% 
+  separate(year, into = c("century", "year"), sep = 2)
+```
+
+
+You can futher customize separate() with the remove, convert, and extra arguments:
+
+1. remove - Set **remove = FALSE** to **retain** the column of values that were separated in the final data frame.
+
+2. convert - By default, separate() will return new columns as character columns. Set **convert = TRUE** to convert new columns to double (numeric), integer, logical, complex, and factor columns with type.convert().
+
+3. extra - extra controls what happens when the number of new values in a cell does not match the number of new columns in into. If **extra = error (the default)**, separate() to return an error. If **extra = drop**, separate() will **drop new values** and **supply NAs** as necessary to fill the new columns. If extra = merge, separate() will split at most length(into) times.
+
+Look carefully at the column types: you’ll notice that case and population are character columns. This is the default behaviour in separate(): it leaves the type of the column as is. Here, however, it’s not very useful those really are numbers. We can ask separate() to try and convert to better types using convert = TRUE:
+
+```{r separate_cov}
+table3 %>% 
+  separate(rate, into = c("cases", "population"), convert = TRUE)
+```
+
+
+## unite()- Unite several columns into one
+
+unite() does the opposite of separate(): it combines multiple columns into a single column.
+
+We can use unite() to rejoin the century and year columns that we created in the last example. That data is saved in the DSR package as table6.
+
+Give unite() the name of the data frame to reshape, the name of the new column to create (as a **character** string), and the names of the columns to unite. unite() will place an **underscore (_)** between values from separate columns. If you would like to use a different separator, or no separator at all, pass the separator as a character string to sep.
+
+```{r unite}
+unite(table6,"new",century,year,sep="")
+# if no sep="", then connect with _
+unite(table6,"new",century,year)
+```
+
+unite() returns a copy of the data frame that includes the new column, but **not the columns used to build the new column**. If you would like to retain these columns, add the argument remove = FALSE
+
+# Case study
+
+The who data set in the DSR package contains cases of tuberculosis (TB) reported between 1995 and 2013 sorted by country, age, and gender. The data comes in the 2014 World Health Organization Global Tuberculosis Report, available for download at www.who.int/tb/country/data/download/en/. The data provides a wealth of epidemiological information, but it would be difficult to work with the data as it is.
+
+To see the data in its raw form, load DSR with library(DSR) then run
+
+```{r who}
+#View(who)
+dim(who)
+```
+
+who provides a realistic example of tabular data in the wild. It contains redundant columns, odd variable codes, and many missing values. In short, who is messy.
+
+The most unique feature of who is its coding system. Columns five through sixty encode four separate pieces of information in their column names:
+
+The first three letters of each column denote whether the column contains new or old cases of TB. In this data set, each column contains new cases.
+
+The next two letters describe the type of case being counted. We will treat each of these as a separate variable.
+
+* rel stands for cases of relapse
+* ep stands for cases of extrapulmonary TB
+* sn stands for cases of pulmonary TB that could not be diagnosed by a pulmonary smear (smear negative)
+* sp stands for cases of pulmonary TB that could be diagnosed be a pulmonary smear (smear positive)
+* The sixth letter describes the sex of TB patients. The data set groups cases by males (m) and females (f).
+
+The remaining numbers describe the age group of TB patients. The data set groups cases into seven age groups:
+
+* 014 stands for patients that are 0 to 14 years old
+* 1524 stands for patients that are 15 to 24 years old
+* 2534 stands for patients that are 25 to 34 years old
+* 3544 stands for patients that are 35 to 44 years old
+* 4554 stands for patients that are 45 to 54 years old
+* 5564 stands for patients that are 55 to 64 years old
+* 65 stands for patients that are 65 years old or older
+
+### Step1:
+
+Notice that the who data set is untidy in multiple ways. First, the data appears to contain values in its column names. We can move the values into their own column with gather(). This will make it easy to separate the values combined in each code.
+
+```{r step1_gather}
+who<-gather(who,"code","value",5:60)
+head(who)
+```
+
+Next, we want to separate the column into age and gender information. We can separate the values in each code with two passes of separate(). The first pass will split the codes at each underscore.
+ 
+
+Note: Some of the code are "newrel_m5564 (int)", "newrel_m65"
+ 
+```{r step2_separate}
+who<-separate(who,code,into=c("new", "sexage"),sep=7)
+who<-separate(who,new,into=c("new", "var"))
+who[1:5,]
+```
+
+The second pass will split sexage after the first character to create a sex column and an age column.
+
+
+```{r step3_separate}
+who <- separate(who, sexage, c("sex", "age"), sep = 1)
+who[c(1,45,1024,1314,405200,405440),]
+```
+
+Finally, we can move the rel, ep, sn, and sp keys into their own column names with spread().
+
+```{r step4_spread}
+who <- spread(who, var, value,drop = T)[,-8] # drop the empty one
+who[1:5,]
+```
+
 
