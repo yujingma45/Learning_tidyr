@@ -71,7 +71,144 @@ table1$cases
 Then you can extract abd manipulate the value of variables in tidy data with concise, simple code:
 
 ```{r}
-mean(table$cases)
-table1$cases / table$population * 10000
+mean(table1$cases)
+table1$cases / table1$population * 10000
+```
+
+Assume that in these data sets, cases refers to the number of people diagnosed with TB per country per year. To calculate the rate of TB cases per country per year (i.e, the number of people per 10,000 diagnosed with TB), you will need to do four operations with the data. You will need to:
+
+1. Extract the number of TB cases per country per year
+2. Extract the population per country per year (in the same order as above)
+3. Divide cases by population
+4. Multiply by 10000
+
+### Data set one
+
+Since table1 is organized in a tidy fashion, you can calculate the rate like this:
+
+```{r cal_tbl1}
+table1$cases / table1$population * 10000
+```
+
+### Data set two
+
+Data set two intermingles the values of population and cases in the same columns. As a result, you will need to untangle the values whenever you want to work with each variable separately.
+
+```{r cal_tbl2}
+# Data set two
+case_rows <- seq(1,12,2)
+pop_rows <- seq(2,12,2)
+table2$value[case_rows] / table2$value[pop_rows] * 10000
+```
+
+### Data set three
+
+Data set three combines the values of cases and population into the same cells. It may seem that this would help you calculate the rate, but that is not so. You will need to separate the population values from the cases values if you wish to do math with them. This can be done, **but not with “basic” R syntax**.
+
+#### Personal Note: I'm not agree with "but not with “basic” R syntax". So I used basic R to calculation with table 3.
+
+
+```{r cal_tbl3}
+table3_new<-cbind(table3[,-3],t(sapply(table3[,3],function(x) unlist(strsplit(x,split='/')))))
+table3_new[,3:4]<-sapply(table3_new[,3:4],function(x) as.numeric(as.character(x)))
+# Note:the number need to be convert to character then numeric
+rownames(table3_new)<-NULL
+colnames(table3_new)[3:4]<-c("case","population")
+
+table3_new$case/ table3_new$population* 10000
+```
+
+### Data set four and five
+
+```{r cal_tbl4}
+
+cases <- c(table4[,2], table4[,3]) 
+population <- c(table5$'1999', table5$'2000')
+cases / population * 10000
+
+```
+
+Data set one is much easier to work with than with data sets two, three, or four. To work with data sets two, three, and four, you need to take extra steps, which makes your code harder to write, harder to understand, and harder to debug.
+
+# spread() and gather()
+
+The tidyr package will help to tidy your data. It contains four funcions.
+
+The two most important functions in tidyr are gather() and spread(). Each relies on the idea of a key value pair.
+
+## Key value pairs
+
+It's same concept as the dictionary in python. A key value pair us a simple way to record information. Key can be regard as variable names, while value are the values of the variables.
+
+In tidy data, each cell will contain a value and each column name will contain a key.
+
+So when the data contains one column of variable names and another columns of corresponding values, we should use spread() and gather().
+
+```{r show_tbl2}
+table2
+```
+
+n table2, the key column contains only keys (and not just because the column is labelled key). Conveniently, the value column contains the values associated with those keys.
+
+You can use the **spread()** function to tidy this layout.
+
+## spread()
+
+spread() turns a pair of key:value columns into a set of tidy columns. To use spread(), pass it the name of a data frame, then the name of the key column in the data frame, and then the name of the value column. Pass the column names as they are; **do not use quotes**.
+
+```{r spread}
+library(tidyr)
+spread(table2,type,count)
+```
+
+spread() returns a copy of your data set that has had the key and value columns removed. 
+
+In their place, spread() adds a new column for each unique value of the key column. These unique values will form the column names of the new columns. 
+
+spread() distributes the cells of the former value column across the cells of the new columns and truncates any non-key, non-value columns in a way that prevents duplication.
+
+In the other words, spread() will create columns to contains values, while the column names are corresponding keys.
+
+spread() distributes a pair of key:**value** columns into a field of **cells**. The unique values of the **key** column become the **column names** of the field of cells.
+
+### Other Arguments
+
+1. spread() takes three optional arguments in addition to data, key, and value:
+
+2. fill - If the tidy structure creates combinations of variables that do not exist in the original data set, spread() will place an NA in the resulting cells. NA is R’s missing value symbol. You can change this behaviour by passing fill an alternative value to use.
+
+3. convert - If a value column contains **multiple types** of data, its elements will be saved as a single type, usually character strings. As a result, the new columns created by spread() will also contain character strings. If you set convert = TRUE, spread() will run type.convert() on each new column, which will **convert strings to doubles (numerics), integers, logicals, complexes, or factors**.
+
+4. drop - The drop argument controls how spread() handles factors in the key column. If you set drop = FALSE, spread will **keep factor levels** that do not appear in the key column, filling in the missing combinations with the value of fill.
+
+
+## gather()
+
+gather() does the **reverse** of spread(). gather() collects a set of column names and places them into a single “key” column. It also collects the cells of those columns and places them into a single value column. You can use gather() to tidy table4.
+
+```{r show_tbl4a}
+table4a
+```
+
+To use gather(), pass it the name of a data frame to reshape. Then pass gather() **a character string** to use for the name of the “key” column that it will make, as well as a character string to use as the name of the value column that it will make. Finally, specify which columns gather() should collapse into the key value pair (here with integer notation).
+
+```{r gather_tbl4a}
+gather(table4a,"year","case",2:3)
+# year for the variable names
+# case for the variable values
+```
+
+gather() returns a copy of the data frame with the specified columns removed. To this data frame, gather() has added two new columns: a “key” column that contains the former column names of the removed columns, and a value column that contains the former values of the removed columns. 
+
+gather() repeats each of the former column names (as well as each of the original columns) to maintain each combination of values that appeared in the original data set. gather() uses the first string that you supplied as the name of the new “key” column, and it uses the second string as the name of the new value column.
+
+We can do the same to table 4b:
+
+```{r gather_tbl4b}
+table4b
+gather(table4b,"year","population",2:3)
+## another way
+gather(table4b,"year","population",-1)
+
 ```
 
